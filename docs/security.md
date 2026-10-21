@@ -86,3 +86,9 @@ Patch high/critical findings before release. CI pins dependencies/actions, audit
 packages and scans with CodeQL. Signed release provenance, browser accessibility
 testing, OIDC conformance and independent review are planned. Report security
 issues through [private vulnerability reporting](https://github.com/RESOAuth/cloudfront-soca-plugin/security/advisories/new).
+
+Initial CodeQL triage: test permission checks/readbacks use the same open file
+handle. [Alert 4](https://github.com/RESOAuth/cloudfront-soca-plugin/security/code-scanning/4)
+traces operator-configured public document/issuer URLs from the configuration file
+to the CLI's HTTPS document check, not key material. This intended flow was reviewed
+and recorded as a false positive; the query remains enabled.

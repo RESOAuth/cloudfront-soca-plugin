@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -17,9 +17,13 @@ test('generator defaults, seconds override, stable key reuse and secret file per
   try {
     const path = join(dir, 'keys.json');
     await saveNewKeys(path);
-    assert.equal((await stat(path)).mode & 0o777, 0o600);
-    await assert.rejects(saveNewKeys(path));
-    const keys = JSON.parse(await readFile(path));
+    const handle = await open(path, 'r');
+    let keys;
+    try {
+      assert.equal((await handle.stat()).mode & 0o777, 0o600);
+      await assert.rejects(saveNewKeys(path));
+      keys = JSON.parse(await handle.readFile());
+    } finally { await handle.close(); }
     const a = prepare(config, keys);
     assert.equal(a.config.enabled, false);
     assert.equal(a.config.session_ttl_seconds, 43200);
@@ -37,11 +41,16 @@ test('generated ZIP is reproducible, private and independently executable withou
     const first = join(dir, 'one.zip');
     const result = await packageZip(f.deployment, first);
     assert.ok(result.bytes < 150000);
-    assert.equal((await stat(first)).mode & 0o777, 0o600);
+    const handle = await open(first, 'r');
+    let bytes;
+    try {
+      assert.equal((await handle.stat()).mode & 0o777, 0o600);
+      bytes = await handle.readFile();
+    } finally { await handle.close(); }
     await packageZip(f.deployment, join(dir, 'two.zip'));
-    assert.deepEqual(await readFile(first), await readFile(join(dir, 'two.zip')));
+    assert.deepEqual(bytes, await readFile(join(dir, 'two.zip')));
     await assert.rejects(packageZip(f.deployment, first));
-    const files = unzipSync(await readFile(first));
+    const files = unzipSync(bytes);
     assert.deepEqual(Object.keys(files).sort(), ['LICENSE', 'deployment.json', 'index.mjs']);
     for (const [name, bytes] of Object.entries(files)) await writeFile(join(dir, name), bytes, { mode: 0o600 });
     const bundle = await import(pathToFileURL(join(dir, 'index.mjs')).href);
