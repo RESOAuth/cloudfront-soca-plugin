@@ -1,0 +1,11 @@
+node_modules/
+.soca/
+dist/
+*.zip
+*.pem
+*.key
+*.tfstate*
+.terraform/
+*.tfplan
+coverage/
+__pycache__/

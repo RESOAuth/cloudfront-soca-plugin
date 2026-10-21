@@ -1,0 +1,95 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: SOCA Lambda@Edge from a private, versioned deployment ZIP.
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: cloudfront-soca
+    AllowedPattern: '^[A-Za-z0-9_-]{1,64}$'
+    Description: Unique Lambda function name.
+  ArtifactBucket:
+    Type: String
+    MinLength: 3
+    Description: Private versioned S3 artifact bucket in us-east-1.
+  ArtifactKey:
+    Type: String
+    MinLength: 1
+    Description: S3 object key for the generated private ZIP.
+  ArtifactVersion:
+    Type: String
+    MinLength: 1
+    Description: Exact S3 object VersionId, changed on every package update.
+  CodeSha256:
+    Type: String
+    AllowedPattern: '^[A-Za-z0-9+/]{43}=$'
+    Description: Base64 SHA-256 of the ZIP bytes, changed on every package update.
+  TimeoutSeconds:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 30
+    Description: Viewer-request timeout including identity-provider requests.
+
+Rules:
+  EdgeRegion:
+    Assertions:
+      - Assert: !Equals [!Ref 'AWS::Region', us-east-1]
+        AssertDescription: Lambda@Edge must be deployed in us-east-1.
+
+Resources:
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: SOCA Lambda@Edge execution role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Principal:
+              Service: [lambda.amazonaws.com, edgelambda.amazonaws.com]
+      Policies:
+        - PolicyName: function-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}'
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/${FunctionName}:*'
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/us-east-1.${FunctionName}'
+                  - !Sub 'arn:${AWS::Partition}:logs:*:${AWS::AccountId}:log-group:/aws/lambda/us-east-1.${FunctionName}:*'
+
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Description: SOCA stateless CloudFront authentication
+      Role: !GetAtt ExecutionRole.Arn
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Architectures: [x86_64]
+      MemorySize: 128
+      Timeout: !Ref TimeoutSeconds
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: !Ref ArtifactKey
+        S3ObjectVersion: !Ref ArtifactVersion
+
+  Version:
+    Type: AWS::Lambda::Version
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      FunctionName: !Ref Function
+      CodeSha256: !Ref CodeSha256
+      Description: !Sub '${CodeSha256}; timeout=${TimeoutSeconds}'
+
+Outputs:
+  VersionArn:
+    Description: Numbered ARN for a CloudFront viewer-request association.
+    Value: !Ref Version
+  DeployedFunctionName:
+    Description: Deployed function name.
+    Value: !Ref Function
