@@ -4,6 +4,7 @@ export const DEFAULT_PROXY = 'https://dynamic-cimd.resoauth.cloud/cimd/%s';
 export const DEFAULTS = Object.freeze({
   issuer: 'https://auth.resoauth.cloud', enabled: false, security_epoch: 0,
   session_ttl_seconds: 43200, transaction_ttl_seconds: 300,
+  enable_readable_id_token_cookie: false,
   auth_path: '/_soca', protected_paths: ['/'], public_paths: [],
   allow_domains: [], deny_domains: [], allow_emails: [], deny_emails: [],
   metadata_mode: 'hosted', proxy_template: DEFAULT_PROXY,
@@ -73,6 +74,7 @@ export function normalise(input) {
   const issuer = httpsUrl(c.issuer);
   ensure(!issuer.search, 'Issuer cannot contain a query');
   ensure(typeof c.enabled === 'boolean', 'enabled must be boolean');
+  ensure(typeof c.enable_readable_id_token_cookie === 'boolean', 'enable_readable_id_token_cookie must be boolean');
   ensure(Number.isSafeInteger(c.security_epoch) && c.security_epoch >= 0, 'Invalid security_epoch');
   for (const [k, max] of [['session_ttl_seconds', 604800], ['transaction_ttl_seconds', 600]]) ensure(Number.isSafeInteger(c[k]) && c[k] > 0 && c[k] <= max, `Invalid ${k}`);
   ensure(c.max_age_seconds === null || (Number.isSafeInteger(c.max_age_seconds) && c.max_age_seconds >= 0 && c.max_age_seconds <= 86400), 'Invalid max_age_seconds');

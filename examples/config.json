@@ -4,6 +4,7 @@
   "enabled": false,
   "client_name": "Example private documents",
   "session_ttl_seconds": 43200,
+  "enable_readable_id_token_cookie": false,
   "protected_paths": ["/"],
   "public_paths": [],
   "allow_domains": ["example.com"],

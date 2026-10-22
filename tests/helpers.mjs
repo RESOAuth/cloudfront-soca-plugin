@@ -25,7 +25,7 @@ export function fixture(overrides = {}) {
   const deployment = prepare({ origin: 'https://static.example.com', enabled: true, allow_domains: ['example.com'], ...overrides }, newKeys());
   const provider = simulatedProvider(deployment, () => time);
   const handler = createHandler(deployment, { fetchJson: provider.fetchJson, now: () => time });
-  return { deployment, provider, handler, advance: seconds => { time += seconds; } };
+  return { deployment, provider, handler, now: () => time, advance: seconds => { time += seconds; } };
 }
 
 export async function login(f, { claims, headers, jar = '', returnTo = '/private/file.txt' } = {}) {

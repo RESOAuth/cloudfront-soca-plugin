@@ -4,6 +4,7 @@ import { admitted, canonicalPath, digest, documents, ensure, httpsUrl, matches, 
 import { requestJson } from './network.mjs';
 
 const SESSION = '__Host-soca_session';
+const ID_TOKEN = '__Host-soca_id_token';
 const BROWSER = '__Host-soca_browser';
 const TX = '__Host-soca_tx_';
 const random = () => randomBytes(32).toString('base64url');
@@ -19,9 +20,9 @@ function response(status, body = '', extra = {}, type = 'text/plain; charset=utf
   return { status: String(status), headers, body };
 }
 
-function cookie(name, value, age) {
+function cookie(name, value, age, httpOnly = true) {
   ensure(value.length <= 3800, 'Cookie exceeds size limit');
-  return `${name}=${value}; Path=/; Max-Age=${age}; Secure; HttpOnly; SameSite=Lax`;
+  return `${name}=${value}; Path=/; Max-Age=${age}; Secure;${httpOnly ? ' HttpOnly;' : ''} SameSite=Lax`;
 }
 
 function cookies(request) {
@@ -201,8 +202,8 @@ export function createHandler(deployment, { fetchJson = requestJson, now = () =>
         if (method === 'GET') return response(200, '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Sign out</title><h1>Sign out</h1><form method="post"><button type="submit">Sign out of this site</button></form></html>', {}, 'text/html; charset=utf-8');
         if (method !== 'POST' || request.headers.origin?.length !== 1 || request.headers.origin[0].value !== c.origin) return response(403, 'Sign-out requires a same-origin form submission');
         const jar = cookies(request);
-        const names = [SESSION, BROWSER, ...Object.keys(jar).filter(k => k.startsWith(TX))];
-        return response(200, 'You have signed out. You may close this tab.', { 'set-cookie': names.map(k => cookie(k, '', 0)) });
+        const names = [SESSION, ID_TOKEN, BROWSER, ...Object.keys(jar).filter(k => k.startsWith(TX))];
+        return response(200, 'You have signed out. You may close this tab.', { 'set-cookie': names.map(k => cookie(k, '', 0, k !== ID_TOKEN)) });
       }
       if (auth && ![`${c.auth_path}/login`, `${c.auth_path}/callback`].includes(path)) return response(404, 'Not found');
       const protectedPath = auth || (c.protected_paths.some(p => matches(path, p)) && !c.public_paths.some(p => matches(path, p)));
@@ -237,7 +238,16 @@ export function createHandler(deployment, { fetchJson = requestJson, now = () =>
         ensure(!token.error, 'Token endpoint rejected authorisation');
         const identity = await verifyIdentity(token.id_token, d, tx);
         const session = seal({ iat: at, exp: at + c.session_ttl_seconds, revision: cookieRevision, sid: random(), iss: c.issuer, sub: identity.sub }, 'session');
-        return response(303, '', { location: `${c.origin}${safeReturn(tx.return_to, c)}`, 'set-cookie': [...clear, cookie(SESSION, session, c.session_ttl_seconds)] });
+        const issued = [...clear, cookie(SESSION, session, c.session_ttl_seconds)];
+        if (c.enable_readable_id_token_cookie) {
+          const ttl = Math.min(at + c.session_ttl_seconds, identity.exp) - now();
+          ensure(ttl > 0, 'Readable ID token has expired');
+          // Explicit opt-in: expose the original, validated JWT for the static app.
+          issued.push(cookie(ID_TOKEN, token.id_token, ttl, false));
+        } else if (Object.hasOwn(jar, ID_TOKEN)) {
+          issued.push(cookie(ID_TOKEN, '', 0, false));
+        }
+        return response(303, '', { location: `${c.origin}${safeReturn(tx.return_to, c)}`, 'set-cookie': issued });
       }
 
       if (!auth) {

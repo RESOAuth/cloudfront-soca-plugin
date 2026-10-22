@@ -79,6 +79,7 @@ It has no runtime effect. Unknown settings fail validation.
 | `issuer` | Exact trusted issuer; default `https://auth.resoauth.cloud`. |
 | `enabled` | `false`: metadata stays public; protected content and login return 503. |
 | `session_ttl_seconds` | Absolute lifetime, `43200`; integer range 1 to 604800. |
+| `enable_readable_id_token_cookie` | `false`; opt in to the full validated JWT in JavaScript-readable `__Host-soca_id_token`. |
 | `transaction_ttl_seconds` | `300`; integer range 1 to 600, four pending logins maximum. |
 | `protected_paths` / `public_paths` | `['/']` / `[]`. Literal segment prefixes: `/docs` matches itself and descendants, not `/docs-old`. Public exceptions take precedence. |
 | `allow_domains` / `deny_domains` | Empty; exact DNS domains or `*.example.com` for subdomains only. |
@@ -99,6 +100,37 @@ Proxy mode uses sorted-key compact UTF-8 JSON, unpadded base64url, no `client_id
 inside the payload and a 4096-character URL limit. It references a stable public
 `jwks_uri`; inline JWKS is not implemented. Proxy metadata is public and visible
 to the proxy. The proxy does not perform provider authentication.
+
+## Readable ID token
+
+Set `"enable_readable_id_token_cookie": true` in the deployment configuration and
+rebuild the ZIP to expose the original, validated provider ID-token JWT to the
+static app:
+
+```js
+const idToken = document.cookie.split('; ')
+  .find(cookie => cookie.startsWith('__Host-soca_id_token='))?.split('=')[1];
+```
+
+This separate cookie is host-only, `Secure`, `SameSite=Lax`, `Path=/` and deliberately
+omits `HttpOnly`. It expires at the earlier of ID-token expiry and session expiry,
+and is not refreshed by content requests. The authenticated session can outlive it;
+the app must handle an absent token. Logout clears it, and a successful sign-in
+with the option disabled clears a previous readable cookie. Full JWTs exceeding
+3800 characters cause opted-in sign-in to fail; they are never truncated.
+
+For independent verification, use the **issuer's JWKS** from its trusted discovery
+document, not this plugin's client-assertion JWKS. Pin ES256, the configured issuer
+and exact client ID (including proxy mode), and validate expiry and other required
+claims using a maintained library such as [JOSE](https://github.com/panva/jose).
+Decoding alone does not verify a JWT. Browser JWKS retrieval requires provider CORS
+support. The readable token is app identity data; edge access still requires the
+encrypted `HttpOnly` session. Its signature alone does not bind it to that session.
+
+Opting in exposes all ID-token claims to scripts on this origin, including injected
+or third-party scripts. Keep the default off unless the app needs those claims.
+The token is stripped before origin forwarding and is never published in metadata
+or logs. This explicit opt-in is recorded in the SOCA requirements assessment.
 
 ## Test and demo
 

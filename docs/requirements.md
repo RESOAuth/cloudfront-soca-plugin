@@ -8,6 +8,7 @@ or real-provider login is claimed.
 Versioned evidence: [configuration](../src/config.mjs), [runtime](../src/runtime.mjs),
 [network](../src/network.mjs), [generator](../generator/package.mjs),
 [protocol tests](../tests/runtime.test.mjs), [package tests](../tests/package.test.mjs),
+[readable-token tests](../tests/readable-id-token.test.mjs),
 [transport tests](../tests/network.test.mjs), [HTTPS demo](../tests/demo.test.mjs),
 [operations](security.md) and the deployment modules.
 
@@ -36,11 +37,11 @@ Versioned evidence: [configuration](../src/config.mjs), [runtime](../src/runtime
 | F-21 | Partial | Safe return, absolute sessions, CSRF local logout and freshness settings. Individual/RP/back-channel revocation planned. |
 | F-22 | Partial | AWS IAM recovery, disable and security_epoch. Edge propagation prevents instantaneous disable; live drill planned. |
 | F-23 | Partial | Immutable versions, no host mutations, lifecycle/recovery documented. Live rolling upgrade/restore tests planned. |
-| F-24 | Supported | Identity scopes only; discard code/access/ID token, no refresh/offline or delegated profile. |
-| F-25 | Partial | Confidential, purpose-separated, expiring browser-bound cookies and parallel-tab cap. No platform store; true atomic global consume needs shared state. First-binding race documented. |
+| F-24 | Partial | Identity scopes only; discard code/access token, no refresh/offline or delegated profile. ID token discarded by default; explicit readable-cookie opt-in retains the full JWT without confidentiality until token/session expiry. |
+| F-25 | Partial | Confidential, purpose-separated, expiring browser-bound authentication cookies and parallel-tab cap. Readable ID-token cookie is an explicit JavaScript-readable exception; no atomic global consume without shared state. First-binding race documented. |
 | N-01 | Partial | Maintained JOSE, fail-closed crypto, CSRF logout and source review. Independent security review planned. |
 | N-02 | Partial | TLS tests, mixed DNS, pinning, 5-second/128-KiB bounds, no redirects. Restricted-egress/slow-network fault matrix planned. |
-| N-03 | Partial | Minimal encrypted identity, no app logging/telemetry/token retention, boundary tests. External logging, backups/deletion and retention are operator duties. |
+| N-03 | Partial | Minimal encrypted session identity, no app logging/telemetry, boundary tests. Opt-in ID-token cookie exposes claims to origin scripts with bounded expiry. External logging, backups/deletion and retention are operator duties. |
 | N-04 | Partial | Stateless workers, overlap and revocation tested locally. No live failover, rotation, restore or propagation measurements. |
 | N-05 | Partial | Local normal requests, bounded cookies/caches/network, 5-MiB ZIP budget. Distributed rates and sustained load tests planned; use deployment controls such as WAF. |
 | N-06 | Partial | Semantic logout/error UI, no token dumps. Accessibility audit, redacted incident references, tamper-evident audit and metrics planned. |

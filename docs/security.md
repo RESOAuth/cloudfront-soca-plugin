@@ -16,11 +16,25 @@ binding; parallel tabs use independent state-named transaction cookies. Two
 first-ever concurrent login starts without an established browser cookie can race;
 retry the affected tab.
 
-Cookies use purpose-separated HKDF-SHA256 keys, AES-256-GCM with random 96-bit IVs,
+Authentication/transaction cookies use purpose-separated HKDF-SHA256 keys,
+AES-256-GCM with random 96-bit IVs,
 authenticated context, `Secure`, `HttpOnly`, `SameSite=Lax`, host-only scope and
 `Path=/`. No JavaScript storage. Sessions retain only issuer, subject, random ID,
-times and policy revision. No access/refresh/ID tokens survive the callback.
-Expiry is absolute and is not extended by activity.
+times and policy revision. Access/refresh tokens are never retained. ID tokens are
+discarded by default; `enable_readable_id_token_cookie=true` intentionally retains
+the full validated JWT in a separate JavaScript-readable cookie for the static app.
+Session expiry is absolute and is not extended by activity.
+
+That opt-in cookie, `__Host-soca_id_token`, is signed by the provider but not encrypted
+or `HttpOnly`. It is host-only, `Secure`, `SameSite=Lax`, `Path=/`, limited to 3800
+characters, and expires no later than the ID token or session. Oversized/expired
+tokens fail opted-in login before issuing any session. Logout deletes it; signing
+in with the option off deletes a previous copy. It is not renewed on content access
+and never authorises edge requests. All SOCA cookies are stripped from origin
+requests. Every same-origin script can read or alter this cookie, so this is an
+explicit exception to confidential token storage/browser-storage targets in F-24,
+F-25 and N-03. Verify with trusted issuer keys and claims if the app needs independent
+authenticity; the plugin's signing JWKS does not validate provider ID tokens.
 
 Outbound JSON requests require public HTTPS endpoints on port 443, verify TLS,
 check every DNS answer, pin the address, reject redirects, disable pooling and

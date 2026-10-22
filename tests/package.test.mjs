@@ -27,6 +27,7 @@ test('generator defaults, seconds override, stable key reuse and secret file per
     const a = prepare(config, keys);
     assert.equal(a.config.enabled, false);
     assert.equal(a.config.session_ttl_seconds, 43200);
+    assert.equal(a.config.enable_readable_id_token_cookie, false);
     assert.deepEqual(a, prepare(config, keys));
     assert.equal(prepare(config, keys, { SOCA_SESSION_TTL_SECONDS: '120' }).config.session_ttl_seconds, 120);
     for (const value of ['0', '-1', 'abc', '1.5', '604801']) assert.throws(() => prepare(config, keys, { SOCA_SESSION_TTL_SECONDS: value }));
@@ -36,7 +37,7 @@ test('generator defaults, seconds override, stable key reuse and secret file per
 test('generated ZIP is reproducible, private and independently executable without node_modules', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'soca-zip-'));
   try {
-    const f = fixture();
+    const f = fixture({ enable_readable_id_token_cookie: true });
     const l = await login(f);
     const first = join(dir, 'one.zip');
     const result = await packageZip(f.deployment, first);
@@ -52,6 +53,7 @@ test('generated ZIP is reproducible, private and independently executable withou
     await assert.rejects(packageZip(f.deployment, first));
     const files = unzipSync(bytes);
     assert.deepEqual(Object.keys(files).sort(), ['LICENSE', 'deployment.json', 'index.mjs']);
+    assert.equal(JSON.parse(Buffer.from(files['deployment.json']).toString()).config.enable_readable_id_token_cookie, true);
     for (const [name, bytes] of Object.entries(files)) await writeFile(join(dir, name), bytes, { mode: 0o600 });
     const bundle = await import(pathToFileURL(join(dir, 'index.mjs')).href);
     assert.equal((await bundle.handler(event('/_soca/jwks.json'))).status, '200');
@@ -95,6 +97,7 @@ for (const changes of [
   { protected_paths: ['/private/'] }, { auth_path: '/' }, { enabled: 'true' },
   { unknown: true }, { proxy_template: 'https://%s.example.com/cimd' }, { proxy_template: 'https://example.com/cimd?x=%s' },
   { scopes: ['openid', 'offline_access'] }, { security_epoch: -1 },
+  { enable_readable_id_token_cookie: 'true' }, { enable_readable_id_token_cookie: 1 }, { enable_readable_id_token_cookie: null },
 ]) test(`invalid configuration rejected: ${JSON.stringify(changes)}`, () => assert.throws(() => normalise({ ...config, ...changes })));
 
 test('domain label matching, wildcard depth, case folding, deny precedence and default deny', () => {
