@@ -1,0 +1,13 @@
+{
+  "origin": "https://static.example.com",
+  "issuer": "https://auth.resoauth.cloud",
+  "enabled": false,
+  "client_name": "Example private documents",
+  "session_ttl_seconds": 43200,
+  "enable_readable_id_token_cookie": false,
+  "protected_paths": ["/"],
+  "public_paths": [],
+  "allow_domains": ["example.com"],
+  "deny_domains": [],
+  "metadata_mode": "hosted"
+}

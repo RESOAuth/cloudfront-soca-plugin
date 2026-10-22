@@ -1,0 +1,53 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check && npm test
+      - run: npm audit --audit-level=high
+      - name: Emit dependency SBOM without deployment material
+        run: npm sbom --omit=dev --sbom-format=cyclonedx > sbom.json
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dependency-sbom
+          path: sbom.json
+          retention-days: 7
+  infrastructure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: '1.16.0'
+      - run: terraform fmt -recursive -check
+      - run: terraform -chdir=terraform init -backend=false -lockfile=readonly && terraform -chdir=terraform validate
+      - run: terraform -chdir=examples/terraform init -backend=false -lockfile=readonly && terraform -chdir=examples/terraform validate
+      - run: pipx run --spec cfn-lint==1.58.0 cfn-lint cloudformation/template.yaml
+  demo-container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build -t soca-edge-demo .
+      - run: docker run --rm --network=none soca-edge-demo npm test
